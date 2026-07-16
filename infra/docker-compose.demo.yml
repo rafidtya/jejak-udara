@@ -1,0 +1,9 @@
+# Track-A demo: one command, no DB, fixtures baked in.
+#   docker compose -f infra/docker-compose.demo.yml up --build
+# -> http://localhost:8080
+services:
+  demo:
+    build: ../web
+    ports:
+      - "8080:80"
+    restart: unless-stopped

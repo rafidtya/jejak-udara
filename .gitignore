@@ -1,0 +1,30 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+dist/
+
+# env & secrets
+.env
+*.service-account.json
+
+# data — DB is the store; git holds code + small fixtures only
+data/
+*.dump
+*.sql.gz
+*.tif
+*.parquet
+
+# node
+web/node_modules/
+web/dist/
+
+# os / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

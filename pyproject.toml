@@ -1,0 +1,44 @@
+[project]
+name = "jejakudara"
+version = "0.1.0"
+description = "Data orchestration, pollution source attribution & digital twin for DLH Jakarta"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.27",
+    "apscheduler>=3.10",
+    "psycopg[binary]>=3.1",
+    "sqlalchemy>=2.0",
+    "pandas>=2.1",
+    "numpy>=1.26",
+    "scikit-learn>=1.4",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pydantic>=2.6",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+geo = [
+    "geopandas>=0.14",
+    "shapely>=2.0",
+    "pykrige>=1.7",
+    "esda>=2.5",
+    "libpysal>=4.9",
+    "osmnx>=1.9",
+]
+satellite = [
+    "earthengine-api>=0.1.390",
+    "cdsapi>=0.7",
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "mypy>=1.9",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
