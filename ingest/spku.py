@@ -259,16 +259,24 @@ def poll_all() -> None:
     for uuid in uuids:
         url = DETAIL_URL_TMPL.format(uuid=uuid)
         d_status, d_html = _fetch_html(url)
-        d_raw_id = dead_letter("spku", url, d_status, {"html_len": len(d_html or "")})
         if d_status != 200 or not d_html:
-            mark_parsed(d_raw_id, False, f"http {d_status}")
+            dead_letter("spku", url, d_status, {"error": "fetch failed"},
+                        parsed_ok=False, parse_error=f"http {d_status}")
             time.sleep(REQUEST_SPACING_S)
             continue
         payload = _extract_balanced_json(d_html, DETAIL_MARKER)
         if payload is None:
-            mark_parsed(d_raw_id, False, "SPKU_DETAIL_DATA not found/unbalanced")
+            # extraction failed -> keep the FULL html so the parser can be fixed
+            # retroactively (agents.md raw-before-parse rule; storage cost is
+            # acceptable because failures are rare)
+            dead_letter("spku", url, d_status, {"html": d_html},
+                        parsed_ok=False, parse_error="SPKU_DETAIL_DATA not found/unbalanced")
             time.sleep(REQUEST_SPACING_S)
             continue
+        # success path: store the EXTRACTED payload as the raw record of note --
+        # it is the actual data (full HTML would be ~10x bigger, ~790MB/day on a
+        # 24x cadence, and adds nothing once extraction succeeded)
+        d_raw_id = dead_letter("spku", url, d_status, payload)
         try:
             station, rows, in_scope = parse_detail(payload)
         except Exception as exc:

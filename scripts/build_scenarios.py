@@ -28,7 +28,12 @@ def demo_sources() -> list[Source]:
         key=lambda s: -s["ispu"],
     )
     labels = ["lalu_lintas", "industri", "pembakaran"]
-    strengths = [120.0, 90.0, 60.0]
+    # Emission strengths in plume-equation units chosen so near-source peaks land
+    # in a realistic 20-60 ug/m3 range above background (the first run used
+    # toy values ~1e5 too small -- plumes were invisible vs background).
+    # Order-of-magnitude corresponds to ~10-15 g/s -- plausible for a major
+    # corridor/stack; still labeled ILLUSTRATIVE, calibration is Track B (P3.2).
+    strengths = [1.5e7, 1.0e7, 6.0e6]
     out = []
     for st, label, q in zip(stations[:3], labels, strengths):
         x, y = project(st["lon"], st["lat"])
@@ -56,9 +61,13 @@ def main() -> None:
         r = whatif(sources, MET, np.asarray(grid_xy), shape, sc["diff"],
                    background=BACKGROUND)
         after = np.asarray(r["after"])
+        before = np.asarray(r["before"])
+        delta = after - before
         results.append({
             "id": sc["id"], "title": sc["title"],
             "delta_mean_pct": r["delta_mean_pct"],
+            # most-improved cell: the visceral number ("di titik terdampak turun X ug/m3")
+            "delta_max_local_ugm3": round(float(delta.min()), 1),
             "values": [round(float(x), 2) for x in after.ravel()],
         })
 

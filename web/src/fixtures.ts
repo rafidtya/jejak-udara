@@ -31,6 +31,7 @@ export interface Heatmap {
   metric: string;
   n_stations_used: number;
   n_stations_stale_excluded: number;
+  n_outliers_removed: number;
   loocv: { rmse: number; mae: number; bias: number; r2: number; n: number };
   values: number[];
   disclaimer: string;
@@ -40,6 +41,7 @@ export interface ScenarioResult {
   id: string;
   title: string;
   delta_mean_pct: number;
+  delta_max_local_ugm3: number;
   values: number[];
 }
 

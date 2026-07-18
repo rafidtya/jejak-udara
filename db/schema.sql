@@ -2,7 +2,21 @@
 -- Convention: ALL timestamps UTC (timestamptz). Geometry EPSG:4326; metric math in 32748 at query time.
 
 CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+-- TimescaleDB is OPTIONAL (scale optimization, unneeded at MVP volume). Guarded
+-- so the same schema applies on plain PostGIS now and a Timescale DB later.
+DO $$ BEGIN
+  CREATE EXTENSION IF NOT EXISTS timescaledb;
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'timescaledb unavailable -> hypertables become plain tables (fine at MVP scale)';
+END $$;
+
+-- Helper: turn a table into a hypertable IFF timescaledb is present; else no-op.
+CREATE OR REPLACE FUNCTION _maybe_hypertable(tbl regclass, col text) RETURNS void AS $$
+BEGIN
+  PERFORM create_hypertable(tbl, col, if_not_exists => TRUE);
+EXCEPTION WHEN undefined_function OR others THEN
+  NULL;  -- plain table
+END $$ LANGUAGE plpgsql;
 
 -- ============ reference ============
 CREATE TABLE IF NOT EXISTS stations (
@@ -31,7 +45,7 @@ CREATE TABLE IF NOT EXISTS raw_payloads (
     parsed_ok    boolean DEFAULT false,
     parse_error  text
 );
-SELECT create_hypertable('raw_payloads', 'fetched_at', if_not_exists => TRUE);
+SELECT _maybe_hypertable('raw_payloads', 'fetched_at');
 
 -- ============ time series ============
 CREATE TABLE IF NOT EXISTS readings (
@@ -48,7 +62,7 @@ CREATE TABLE IF NOT EXISTS readings (
     -- conflicts with the first (caught during spku.py implementation, never shipped).
     PRIMARY KEY (station_id, ts, pollutant, is_index)
 );
-SELECT create_hypertable('readings', 'ts', if_not_exists => TRUE);
+SELECT _maybe_hypertable('readings', 'ts');
 
 CREATE TABLE IF NOT EXISTS weather_forecasts (
     adm4_code    text NOT NULL,
@@ -64,7 +78,20 @@ CREATE TABLE IF NOT EXISTS weather_forecasts (
     tp           double precision,              -- precip mm / 3h
     PRIMARY KEY (adm4_code, run_ts, valid_ts)
 );
-SELECT create_hypertable('weather_forecasts', 'valid_ts', if_not_exists => TRUE);
+SELECT _maybe_hypertable('weather_forecasts', 'valid_ts');
+
+-- Historical hourly wind (Open-Meteo) -- BMKG has no history API, so this is
+-- how Layer A pairs past concentration with past wind. Keyed by station for a
+-- trivial join (wind ~constant across a kelurahan; station-level is fine).
+CREATE TABLE IF NOT EXISTS weather_history (
+    station_id   text NOT NULL REFERENCES stations(station_id),
+    ts           timestamptz NOT NULL,
+    wd_deg       double precision,             -- wind FROM, deg cw from N (meteorological)
+    ws           double precision,             -- m/s
+    source       text NOT NULL DEFAULT 'open-meteo',
+    PRIMARY KEY (station_id, ts)
+);
+SELECT _maybe_hypertable('weather_history', 'ts');
 
 CREATE TABLE IF NOT EXISTS fire_events (
     id           bigserial PRIMARY KEY,
@@ -139,7 +166,7 @@ CREATE TABLE IF NOT EXISTS forecast_surfaces (
     valid_ts     timestamptz NOT NULL,
     pollutant    text NOT NULL,
     grid         jsonb NOT NULL,                -- encoded grid (demo scale); GeoTIFF store later
-    kind         text NOT NULL CHECK (kind IN ('plume','ml','whatif')),
+    kind         text NOT NULL CHECK (kind IN ('measured','plume','ml','whatif')),
     scenario     jsonb,                         -- what-if diff, null for plain forecast
     PRIMARY KEY (run_ts, valid_ts, pollutant, kind)
 );

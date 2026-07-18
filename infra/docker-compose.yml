@@ -1,14 +1,28 @@
 services:
+  ingest:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.ingest
+    environment:
+      DATABASE_URL: postgresql://jejakudara:jejakudara@db:5432/jejakudara
+      SCRAPER_USER_AGENT: ${SCRAPER_USER_AGENT:-JejakUdara-research/0.1}
+      FIRMS_API_KEY: ${FIRMS_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   db:
-    image: timescale/timescaledb-ha:pg16   # PostGIS + TimescaleDB in one image
+    image: postgis/postgis:16-3.4   # PostGIS on PG16; light. Timescale is optional
+                                     # (schema guards its use) and unneeded at MVP volume.
     environment:
       POSTGRES_USER: jejakudara
       POSTGRES_PASSWORD: jejakudara
       POSTGRES_DB: jejakudara
     ports:
-      - "5432:5432"
+      - "5544:5432"   # 5544 on host to avoid collision with any native/other PG on 5432
     volumes:
-      - dbdata:/home/postgres/pgdata
+      - dbdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U jejakudara"]
       interval: 5s

@@ -8,7 +8,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
 import type { Heatmap, Station } from "../fixtures";
 import {
-  bboxCorners, gridToDataURL, ispuColor, ISPU_LEGEND, JAKARTA_CENTER, OSM_STYLE,
+  bboxCorners, createMapWithFallback, gridToDataURL, ispuColor, ISPU_LEGEND,
+  JAKARTA_CENTER,
 } from "../mapUtils";
 
 interface Props {
@@ -38,16 +39,14 @@ export default function PetaView({ stations, heatmap }: Props) {
 
   useEffect(() => {
     if (!mapDiv.current || mapRef.current) return;
-    const map = new maplibregl.Map({
-      container: mapDiv.current,
-      style: OSM_STYLE,
-      center: JAKARTA_CENTER,
-      zoom: 10.3,
-      attributionControl: { compact: true },
-    });
+    const map = createMapWithFallback(
+      mapDiv.current,
+      { center: JAKARTA_CENTER, zoom: 10.3 },
+      (m) => addDataLayers(m),
+    );
     mapRef.current = map;
 
-    map.on("load", () => {
+    function addDataLayers(map: maplibregl.Map) {
       if (heatmap) {
         map.addSource("surface", {
           type: "image",
@@ -96,7 +95,7 @@ export default function PetaView({ stations, heatmap }: Props) {
       });
       map.on("mouseenter", "stations", () => { map.getCanvas().style.cursor = "pointer"; });
       map.on("mouseleave", "stations", () => { map.getCanvas().style.cursor = ""; });
-    });
+    }
 
     return () => { map.remove(); mapRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,9 +131,18 @@ export default function PetaView({ stations, heatmap }: Props) {
           <div className="card">
             <div className="muted small">{heatmap.disclaimer}</div>
             <div className="small">
-              Validasi LOOCV nyata: R²={heatmap.loocv.r2}, RMSE={heatmap.loocv.rmse}{" "}
-              ({heatmap.metric}, {heatmap.n_stations_used} stasiun)
+              Validasi LOOCV (nyata, tidak disembunyikan): RMSE ±{heatmap.loocv.rmse}{" "}
+              {heatmap.metric.startsWith("PM2.5") ? "µg/m³" : "poin"} (n=
+              {heatmap.loocv.n}, R²={heatmap.loocv.r2}).
             </div>
+            {heatmap.loocv.r2 < 0.3 && (
+              <div className="muted small">
+                R² rendah = variasi antar-stasiun tinggi (jaringan sensor campuran) —
+                permukaan ini orientasi visual kasar, bukan prediksi presisi.
+                Perbaikan (kriging + agregasi temporal + kalibrasi) adalah bagian
+                rencana menuju final.
+              </div>
+            )}
           </div>
         )}
         <div className="legend">

@@ -1,7 +1,15 @@
 /** Map helpers shared by Peta & Twin views. */
+import maplibregl from "maplibre-gl";
 import type { StyleSpecification } from "maplibre-gl";
 
-/** Free OSM raster basemap — no API key. Attribution required and included. */
+/**
+ * Basemap: OpenFreeMap "Liberty" — free vector style, NO token/signup
+ * (vs Mapbox: similar polish but token + proprietary license). Swap to a
+ * Mapbox style URL + token here if the team ever wants it; nothing else changes.
+ */
+export const BASEMAP_STYLE = "https://tiles.openfreemap.org/styles/liberty";
+
+/** Fallback: raw OSM raster (kept for emergencies — e.g. OpenFreeMap outage). */
 export const OSM_STYLE: StyleSpecification = {
   version: 8,
   sources: {
@@ -86,4 +94,96 @@ export function bboxCorners(
 ): [[number, number], [number, number], [number, number], [number, number]] {
   const [w, s, e, n] = bbox;
   return [[w, n], [e, n], [e, s], [w, s]];
+}
+
+/** Minimal structural GeoJSON types (avoids depending on @types/geojson resolution). */
+export interface ColumnFeature {
+  type: "Feature";
+  geometry: { type: "Polygon"; coordinates: number[][][] };
+  properties: { v: number; h: number };
+}
+export interface ColumnCollection {
+  type: "FeatureCollection";
+  features: ColumnFeature[];
+}
+
+/**
+ * 3D pollution columns: grid cells above background become extruded square
+ * columns — height & color encode concentration. Row 0 = SOUTH (grid_over_bbox
+ * convention); GeoJSON is computed in lat directly, so no flipping here.
+ */
+export function gridToColumns(
+  values: number[],
+  nrows: number,
+  ncols: number,
+  bbox: [number, number, number, number],
+  background: number,
+  metersPerUnit = 45,
+): ColumnCollection {
+  const [w, s, e, n] = bbox;
+  const dLon = (e - w) / ncols;
+  const dLat = (n - s) / nrows;
+  const features: ColumnFeature[] = [];
+  for (let r = 0; r < nrows; r++) {
+    for (let c = 0; c < ncols; c++) {
+      const v = values[r * ncols + c];
+      if (v <= background + 0.5) continue; // background cells stay flat
+      const x0 = w + c * dLon;
+      const y0 = s + r * dLat;
+      features.push({
+        type: "Feature",
+        geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [x0, y0], [x0 + dLon, y0], [x0 + dLon, y0 + dLat],
+            [x0, y0 + dLat], [x0, y0],
+          ]],
+        },
+        properties: { v, h: (v - background) * metersPerUnit },
+      });
+    }
+  }
+  return { type: "FeatureCollection", features };
+}
+
+/** MapLibre color expression for column concentration (µg/m³). */
+export const COLUMN_COLOR_EXPR = [
+  "interpolate", ["linear"], ["get", "v"],
+  18, "#00a65a", 30, "#ffdd57", 45, "#ff851b", 60, "#dd4b39", 80, "#401450",
+] as unknown as string;
+
+/**
+ * Create a map on the vector basemap, with automatic RASTER FALLBACK:
+ * if the vector style hasn't finished loading within `timeoutMs` (CDN outage,
+ * blocked network, presentation-venue wifi), swap to the self-contained OSM
+ * raster style so the demo never shows a black map. `onReady` fires exactly
+ * once, after whichever style ends up active — add sources/layers there.
+ */
+export function createMapWithFallback(
+  container: HTMLElement,
+  options: Partial<ConstructorParameters<typeof maplibregl.Map>[0]>,
+  onReady: (map: maplibregl.Map) => void,
+  timeoutMs = 10000,
+): maplibregl.Map {
+  const map = new maplibregl.Map({
+    container,
+    style: BASEMAP_STYLE,
+    attributionControl: { compact: true },
+    ...options,
+  } as ConstructorParameters<typeof maplibregl.Map>[0]);
+  let ready = false;
+  const finish = () => {
+    if (!ready) {
+      ready = true;
+      onReady(map);
+    }
+  };
+  map.once("load", finish);
+  window.setTimeout(() => {
+    if (!ready) {
+      map.setStyle(OSM_STYLE);
+      map.once("styledata", () => window.setTimeout(finish, 250));
+    }
+  }, timeoutMs);
+  return map;
 }
