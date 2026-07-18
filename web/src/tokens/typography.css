@@ -1,0 +1,14 @@
+/* @font-face for Plus Jakarta Sans is provided by @fontsource (imported in main.tsx) */
+:root{
+--font-ui:"Plus Jakarta Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+
+/* Fixed scale per brief: 12/14/16/20/24/32 */
+--text-xs:12px;--text-sm:14px;--text-base:16px;--text-lg:20px;--text-xl:24px;--text-display:32px;
+/* Extra step observed live in the product (wordmark, section labels) */
+--text-2xs:13px;
+
+--weight-regular:400;--weight-medium:500;--weight-semibold:600;--weight-extrabold:800;
+
+--leading-tight:100%;--leading-normal:1.45;--tracking-tight:-0.08em;
+}
+body,input,button{font-variant-numeric:tabular-nums}

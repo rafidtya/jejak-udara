@@ -1,0 +1,9 @@
+:root{
+--space-1:5px;--space-2:8px;--space-3:10px;--space-4:14px;--space-5:16px;--space-6:20px;--space-7:24px;--space-8:32px;
+
+/* Radii — exact source values, not snapped to a 4/8 grid */
+--radius-sm:6px;--radius-md:11px;--radius-lg:16px;--radius-pill:999px;--radius-circle:50%;
+
+/* Map/console geometry constants seen across every screen */
+--topbar-inset:14px;--control-size:46px;--pin-size:50px;
+}

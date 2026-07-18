@@ -1,73 +1,39 @@
 /**
- * JejakUdara — Track-A demo shell. Fixture-fed (frozen REAL data, no backend);
- * in August the fixtures swap for live API calls, views stay.
+ * JejakUdara — 4-view console (Peta / Twin / Sumber / Kelayakan), design system
+ * implemented from the Claude Design project, wired to the live backend API.
  */
 import { useEffect, useState } from "react";
-import "./app.css";
-import type { Heatmap, Meta, ScenarioSet, Station } from "./fixtures";
-import { loadJson } from "./fixtures";
+import { api } from "./api";
+import { type View } from "./components/chrome";
 import KelayakanView from "./views/KelayakanView";
 import PetaView from "./views/PetaView";
 import SumberView from "./views/SumberView";
 import TwinView from "./views/TwinView";
 
-const VIEWS = ["Peta", "Twin", "Sumber", "Kelayakan"] as const;
-type View = (typeof VIEWS)[number];
-
 export default function App() {
   const [view, setView] = useState<View>("Peta");
-  const [stations, setStations] = useState<Station[] | null>(null);
-  const [heatmap, setHeatmap] = useState<Heatmap | null>(null);
-  const [scenarios, setScenarios] = useState<ScenarioSet | null>(null);
-  const [meta, setMeta] = useState<Meta | null>(null);
+  const [stationCount, setStationCount] = useState(0);
+  const [sourceCount, setSourceCount] = useState(0);
 
   useEffect(() => {
-    loadJson<Station[]>("/fixtures/stations.json").then(setStations);
-    loadJson<Heatmap>("/fixtures/heatmap.json").then(setHeatmap);
-    loadJson<ScenarioSet>("/fixtures/scenarios.json").then(setScenarios);
-    loadJson<Meta>("/fixtures/meta.json").then(setMeta);
+    api.meta().then((m) => setStationCount(m?.station_count ?? 0));
+    api.sources().then((s) => setSourceCount(s?.candidates.length ?? 0));
   }, []);
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <h1>JejakUdara</h1>
-        <span className="tagline">
-          Dari mana polusi Jakarta berasal — dan apa yang terjadi jika kita bertindak
-        </span>
-        {meta && (
-          <span className="freshness">
-            Snapshot data nyata:{" "}
-            {new Date(meta.captured_at_utc).toLocaleDateString("id-ID")} ·{" "}
-            {meta.station_count} stasiun SPKU
-          </span>
-        )}
-      </header>
-      <nav className="nav">
-        {VIEWS.map((v) => (
-          <button
-            key={v}
-            className={`nav-btn ${view === v ? "active" : ""}`}
-            onClick={() => setView(v)}
-          >
-            {v}
-          </button>
-        ))}
-      </nav>
-      <main className="main">
-        {view === "Peta" &&
-          (stations ? (
-            <PetaView stations={stations} heatmap={heatmap} />
-          ) : (
-            <p className="muted view-pad">Memuat snapshot stasiun…</p>
-          ))}
-        {view === "Twin" && <TwinView scenarios={scenarios} />}
-        {view === "Sumber" && <SumberView />}
-        {view === "Kelayakan" && <KelayakanView meta={meta} />}
-      </main>
-      <footer className="footer">
-        Data: DLH DKI Jakarta (SPKU) · BMKG · demo prototipe — seluruh permukaan
-        berlabel <em>estimasi</em>, titik stasiun = terukur
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ flex: 1, minHeight: 0 }}>
+        {view === "Peta" && <PetaView view={view} onChange={setView} stationCount={stationCount} sourceCount={sourceCount} />}
+        {view === "Twin" && <TwinView view={view} onChange={setView} stationCount={stationCount} sourceCount={sourceCount} />}
+        {view === "Sumber" && <SumberView view={view} onChange={setView} />}
+        {view === "Kelayakan" && <KelayakanView view={view} onChange={setView} />}
+      </div>
+      <footer style={{
+        padding: "6px 18px", fontSize: "var(--text-xs)", color: "var(--fg-secondary)",
+        background: "var(--gray-050)", borderTop: "1px solid var(--gray-100)", fontFamily: "var(--font-ui)",
+      }}>
+        Data: DLH DKI Jakarta (SPKU) · BMKG · Open-Meteo — seluruh permukaan berlabel{" "}
+        <em>estimasi</em>, titik stasiun = terukur
       </footer>
     </div>
   );

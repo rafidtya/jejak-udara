@@ -1,150 +1,115 @@
 /**
- * Twin view — 3D what-if simulator. Pollution renders as EXTRUDED COLUMNS
- * (height + color = concentration above background) on a pitched camera, over
- * the real precomputed Gaussian-plume grids. Physics = the project's actual
- * engine (twin/plume.py); honesty labels throughout.
+ * Twin — real 3D plume columns from the live Gaussian-plume engine (/twin/whatif),
+ * design chrome + ScenarioButton + DeltaBadge. Height/color = concentration above
+ * background. All labeled simulasi.
  */
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
-import type { ScenarioSet } from "../fixtures";
-import {
-  COLUMN_COLOR_EXPR, createMapWithFallback, gridToColumns, JAKARTA_CENTER,
-} from "../mapUtils";
+import { api, type WhatIf } from "../api";
+import { MapControls, NavTabs, TopBar, type View } from "../components/chrome";
+import { Card, DeltaBadge, DisclaimerNote, ScenarioButton } from "../components/primitives";
+import { COLUMN_COLOR_EXPR, createMapWithFallback, gridToColumns, JAKARTA_CENTER } from "../mapUtils";
 
-interface Props {
-  scenarios: ScenarioSet | null;
-}
+interface Props { view: View; onChange: (v: View) => void; stationCount: number; sourceCount: number; }
 
-const SOURCE_ICON: Record<string, string> = {
-  lalu_lintas: "🚗", industri: "🏭", pembakaran: "🔥",
-};
+const SCENARIOS: { id: string; title: string; body: Record<string, unknown> }[] = [
+  { id: "baseline", title: "Baseline (kondisi saat ini)", body: {} },
+  { id: "lalin", title: "Kurangi lalu lintas 50%", body: { scale: { lalu_lintas: 0.5 } } },
+  { id: "industri", title: "Tutup sumber industri", body: { disable: ["industri"] } },
+  { id: "hujan", title: "Hujan 5 mm (washout)", body: { rain_mm: 5 } },
+];
+const BG = 18;
+const SRC_ICON: Record<string, string> = { lalu_lintas: "🚗", industri: "🏭", pembakaran: "🔥" };
 
-/** Add 3D buildings if the basemap style carries a building source-layer. */
-function tryAddBuildings(map: maplibregl.Map) {
-  try {
-    const style = map.getStyle();
-    if (style.layers?.some((l) => l.id.includes("building-3d"))) return;
-    const bldg = style.layers?.find(
-      (l) => "source-layer" in l && (l as { "source-layer"?: string })["source-layer"] === "building",
-    ) as { source?: string } | undefined;
-    if (!bldg?.source) return;
-    map.addLayer({
-      id: "jk-buildings-3d",
-      type: "fill-extrusion",
-      source: bldg.source,
-      "source-layer": "building",
-      minzoom: 13,
-      paint: {
-        "fill-extrusion-color": "#d8dce1",
-        "fill-extrusion-height": ["coalesce", ["get", "render_height"], 12],
-        "fill-extrusion-opacity": 0.55,
-      },
-    });
-  } catch {
-    /* buildings are polish, never fatal */
-  }
-}
-
-export default function TwinView({ scenarios }: Props) {
+export default function TwinView({ view, onChange, stationCount, sourceCount }: Props) {
   const mapDiv = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const [selected, setSelected] = useState("baseline");
+  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const [sel, setSel] = useState("baseline");
+  const [result, setResult] = useState<WhatIf | null>(null);
 
+  // fetch the selected scenario from the live engine
   useEffect(() => {
-    if (!mapDiv.current || mapRef.current || !scenarios) return;
+    const sc = SCENARIOS.find((s) => s.id === sel)!;
+    api.whatif(sc.body).then(setResult);
+  }, [sel]);
+
+  // init map once
+  useEffect(() => {
+    if (!mapDiv.current || mapRef.current) return;
     const map = createMapWithFallback(
       mapDiv.current,
-      { center: JAKARTA_CENTER, zoom: 10.6, pitch: 57, bearing: -12, maxPitch: 70 },
+      { center: JAKARTA_CENTER, zoom: 10.6, pitch: 55, bearing: -12, maxPitch: 70 },
       (m) => {
-        tryAddBuildings(m);
-        const baseline = scenarios.scenarios.find((s) => s.id === "baseline")!;
-        m.addSource("plume-columns", {
-          type: "geojson",
-          data: gridToColumns(
-            baseline.values, scenarios.nrows, scenarios.ncols,
-            scenarios.bbox, scenarios.background_ugm3,
-          ) as unknown as GeoJSON.GeoJSON,
-        });
+        m.addSource("plume", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
         m.addLayer({
-          id: "plume-columns",
-          type: "fill-extrusion",
-          source: "plume-columns",
+          id: "plume", type: "fill-extrusion", source: "plume",
           paint: {
             "fill-extrusion-color": COLUMN_COLOR_EXPR,
-            "fill-extrusion-height": ["get", "h"],
-            "fill-extrusion-opacity": 0.78,
+            "fill-extrusion-height": ["get", "h"], "fill-extrusion-opacity": 0.78,
           },
         });
       },
     );
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-left");
-    // markers are DOM overlays -- independent of style load, add immediately
-    for (const src of scenarios.sources) {
-      const el = document.createElement("div");
-      el.className = "source-marker";
-      el.textContent = SOURCE_ICON[src.label] ?? "📍";
-      el.title = `${src.label} (ilustratif)`;
-      new maplibregl.Marker({ element: el }).setLngLat([src.lon, src.lat]).addTo(map);
-    }
     mapRef.current = map;
-
     return () => { map.remove(); mapRef.current = null; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scenarios]);
+  }, []);
 
+  // push new plume + source markers whenever the result changes
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !scenarios) return;
-    const sc = scenarios.scenarios.find((s) => s.id === selected);
-    const src = map.getSource("plume-columns") as maplibregl.GeoJSONSource | undefined;
-    if (sc && src) {
-      src.setData(gridToColumns(
-        sc.values, scenarios.nrows, scenarios.ncols,
-        scenarios.bbox, scenarios.background_ugm3,
-      ) as unknown as GeoJSON.GeoJSON);
-    }
-  }, [selected, scenarios]);
+    const m = mapRef.current;
+    if (!m || !result?.available) return;
+    const apply = () => {
+      const src = m.getSource("plume") as maplibregl.GeoJSONSource | undefined;
+      if (!src) return;
+      src.setData(gridToColumns(result.after, result.nrows, result.ncols, result.bbox, BG) as unknown as GeoJSON.GeoJSON);
+      markersRef.current.forEach((mk) => mk.remove());
+      markersRef.current = result.sources.map((s) => {
+        const el = document.createElement("div");
+        el.className = "source-marker"; el.textContent = SRC_ICON[s.label] ?? "📍";
+        el.style.fontSize = "22px"; el.title = `${s.label} (ilustratif)`;
+        return new maplibregl.Marker({ element: el }).setLngLat([s.lon, s.lat]).addTo(m);
+      });
+    };
+    if (m.isStyleLoaded() && m.getSource("plume")) apply(); else m.once("idle", apply);
+  }, [result]);
 
-  if (!scenarios) {
-    return <p className="muted view-pad">Fixture skenario belum tersedia — jalankan scripts/build_scenarios.py</p>;
-  }
-  const current = scenarios.scenarios.find((s) => s.id === selected)!;
+  const cur = SCENARIOS.find((s) => s.id === sel)!;
 
   return (
-    <div className="view-map">
-      <div ref={mapDiv} className="map-container" />
-      <aside className="map-panel">
-        <h2>Digital twin — simulasi skenario 3D</h2>
-        <p className="muted small">
-          Tinggi &amp; warna kolom = konsentrasi di atas latar ({scenarios.background_ugm3}{" "}
-          µg/m³). {scenarios.met.label}. Geser dengan klik-kanan untuk memutar kamera.
-        </p>
-        <div className="scenario-list">
-          {scenarios.scenarios.map((sc) => (
-            <button
-              key={sc.id}
-              className={`scenario-btn ${sc.id === selected ? "active" : ""}`}
-              onClick={() => setSelected(sc.id)}
-            >
-              {sc.title}
-            </button>
-          ))}
-        </div>
-        {current.id !== "baseline" && (
-          <div className={`delta-badge ${current.delta_max_local_ugm3 < 0 ? "good" : "bad"}`}>
-            Di titik paling terdampak: {current.delta_max_local_ugm3} µg/m³ vs baseline
-            <div className="small" style={{ fontWeight: 400 }}>
-              (rata-rata seluruh kota: {current.delta_mean_pct > 0 ? "+" : ""}
-              {current.delta_mean_pct}% — dampak intervensi bersifat lokal di sekitar
-              sumber, sesuai fisika dispersi)
-            </div>
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
+      <div ref={mapDiv} style={{ position: "absolute", inset: 0 }} />
+      <div style={{ position: "absolute", inset: "var(--topbar-inset)", display: "flex", flexDirection: "column", pointerEvents: "none" }}>
+        <div style={{ pointerEvents: "auto" }}><TopBar stationCount={stationCount} sourceCount={sourceCount} /></div>
+        <div style={{ margin: "10px 0 0", pointerEvents: "auto" }}><NavTabs active={view} onChange={onChange} /></div>
+        <div style={{ flex: 1, position: "relative" }}>
+          <div style={{ position: "absolute", right: 0, top: 8, pointerEvents: "auto" }}>
+            <MapControls onZoomIn={() => mapRef.current?.zoomIn()} onZoomOut={() => mapRef.current?.zoomOut()} />
           </div>
-        )}
-        <div className="card">
-          <div className="muted small">{scenarios.disclaimer}</div>
+          <div style={{ position: "absolute", left: 0, bottom: 0, width: 340, pointerEvents: "auto" }}>
+            <Card>
+              <h2 style={{ fontSize: "var(--text-base)", marginBottom: 6 }}>Digital twin — simulasi skenario 3D</h2>
+              <p style={{ color: "var(--fg-secondary)", fontSize: "var(--text-2xs)", marginBottom: 10 }}>
+                Tinggi &amp; warna kolom = konsentrasi di atas latar ({BG} µg/m³). Contoh angin baratan 3 m/s (bukan data live).
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                {SCENARIOS.map((sc) => (
+                  <ScenarioButton key={sc.id} title={sc.title} active={sc.id === sel} onClick={() => setSel(sc.id)} />
+                ))}
+              </div>
+              {cur.id !== "baseline" && result?.available && (
+                <DeltaBadge deltaMaxLocal={result.delta_max_local_ugm3} deltaMeanPct={result.delta_mean_pct} />
+              )}
+              <div style={{ background: "#fff", borderRadius: 8, padding: 8, marginTop: 8 }}>
+                <DisclaimerNote>
+                  {result?.disclaimer ?? "Simulasi plume Gaussian (mesin asli), bukan pengukuran. Lokasi sumber ilustratif; fisika & delta nyata."}
+                </DisclaimerNote>
+              </div>
+            </Card>
+          </div>
         </div>
-      </aside>
+      </div>
     </div>
   );
 }

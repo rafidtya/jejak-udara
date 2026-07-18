@@ -1,0 +1,41 @@
+:root{
+/* Brand — Primary Blue (Figma "0153A4" scale) */
+--blue-050:#BAD8F6;--blue-100:#A5C9ED;--blue-150:#91BBE4;--blue-200:#7CACDB;--blue-300:#538EC8;
+--blue-400:#2A71B6;--blue-500:#0153A4;--blue-600:#014283;--blue-700:#013262;--blue-800:#002142;
+--blue-850:#001931;--blue-900:#001121;--blue-950:#000810;
+
+/* Brand — Secondary Green (Figma "00B055" scale) */
+--green-050:#C3F7DC;--green-100:#AEEFCD;--green-150:#98E7BE;--green-200:#82DFAF;--green-300:#57D091;
+--green-400:#2BC073;--green-500:#00B055;--green-600:#008D44;--green-700:#006A33;--green-800:#004622;
+--green-850:#00351A;--green-900:#002311;--green-950:#001209;
+
+/* Neutral gray scale — merged from Figma "FFFFFF" (light) + "000000" (dark) scales */
+--gray-000:#FFFFFF;--gray-050:#FAFAFA;--gray-100:#E1E1E1;--gray-200:#C4C4C4;--gray-300:#A6A6A6;
+--gray-350:#979797;--gray-400:#898989;--gray-450:#858585;--gray-500:#767676;--gray-550:#737373;
+--gray-600:#696969;--gray-650:#686868;--gray-700:#595959;--gray-800:#3B3B3B;--gray-900:#1E1E1E;
+--gray-950:#000000;
+
+/* Semantic text/surface aliases */
+--fg-primary:#000000;--fg-secondary:var(--gray-550);--fg-tertiary:var(--gray-600);
+--fg-on-brand:#FFFFFF;--fg-link:var(--blue-500);--fg-link-hover:var(--blue-600);
+--surface-page:#FFFFFF;--surface-card:var(--gray-050);--surface-card-translucent:rgba(255,255,255,0.95);
+--surface-panel-translucent:rgba(255,255,255,0.66);--border-hairline:rgba(0,0,0,0.1);
+
+/* ISPU severity ramp — matches ingest/mapUtils.ts ispuColor()/ISPU_LEGEND */
+--ispu-baik:#00a65a;--ispu-sedang:#0073b7;--ispu-tidak-sehat:#ff851b;
+--ispu-sangat-tidak-sehat:#dd4b39;--ispu-berbahaya:#111111;--ispu-stale:#9aa0a6;
+
+/* Density-heatmap perceptual ramp (surface/plume — distinct from ISPU dot colors per brief) */
+--heat-low:#00a65a;--heat-mod:#ffdd57;--heat-high:#ff851b;--heat-vhigh:#dd4b39;--heat-extreme:#401450;
+
+/* Data-state semantics (non-negotiable honesty rules) */
+--state-measured:var(--blue-500);--state-estimated:rgba(1,83,164,0.35);--state-stale:var(--ispu-stale);
+--state-confidence-low:rgba(1,83,164,0.25);--state-confidence-high:var(--blue-500);
+
+/* Feedback */
+--positive-bg:#e6f6ec;--positive-fg:#14713d;--negative-bg:#fdecea;--negative-fg:#a12622;
+--warn-bg:#fff3cd;--warn-fg:#7a5c00;
+
+/* Shadows (exact, from Figma — do not round) */
+--shadow-sm:0px 2px 3px 0px rgba(0,0,0,0.06);--shadow-md:0px 4px 4px 0px rgba(0,0,0,0.1);
+}
