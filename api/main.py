@@ -93,7 +93,9 @@ def surface(pollutant: str = "pm25", kind: str = "measured") -> dict[str, Any]:
         return {"available": False, "reason": "belum ada surface — jalankan analytics batch"}
     grid, run_ts = rows[0]
     return {"available": True, "run_ts": str(run_ts), **grid,
-            "disclaimer": "Permukaan interpolasi (estimasi spasial), bukan pengukuran langsung."}
+            "disclaimer": "Permukaan interpolasi (estimasi spasial), bukan pengukuran langsung. "
+                           "Warna memudar menjauhi stasiun nyata — area tanpa cakupan sensor "
+                           "(mis. kota tetangga) sengaja tidak digambar seyakin area berstasiun."}
 
 
 @app.get("/hotspots")

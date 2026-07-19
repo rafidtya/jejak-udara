@@ -5,7 +5,7 @@
  * spec, avoiding a binary asset; search icon is inline SVG.
  */
 
-const VIEWS = ["Peta", "Twin", "Sumber", "Kelayakan"] as const;
+const VIEWS = ["Peta", "Twin", "Kelayakan"] as const;
 export type View = (typeof VIEWS)[number];
 
 function SearchGlyph() {

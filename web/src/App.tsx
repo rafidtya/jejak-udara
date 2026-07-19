@@ -7,7 +7,6 @@ import { api } from "./api";
 import { type View } from "./components/chrome";
 import KelayakanView from "./views/KelayakanView";
 import PetaView from "./views/PetaView";
-import SumberView from "./views/SumberView";
 import TwinView from "./views/TwinView";
 
 export default function App() {
@@ -25,7 +24,6 @@ export default function App() {
       <div style={{ flex: 1, minHeight: 0 }}>
         {view === "Peta" && <PetaView view={view} onChange={setView} stationCount={stationCount} sourceCount={sourceCount} />}
         {view === "Twin" && <TwinView view={view} onChange={setView} stationCount={stationCount} sourceCount={sourceCount} />}
-        {view === "Sumber" && <SumberView view={view} onChange={setView} />}
         {view === "Kelayakan" && <KelayakanView view={view} onChange={setView} />}
       </div>
       <footer style={{

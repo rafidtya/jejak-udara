@@ -109,7 +109,7 @@ const ISPU_LEVELS = [
   { label: "Tidak Sehat (101–200)", color: "var(--ispu-tidak-sehat)" },
   { label: "Sangat Tidak Sehat (201–300)", color: "var(--ispu-sangat-tidak-sehat)" },
   { label: "Berbahaya (>300)", color: "var(--ispu-berbahaya)" },
-  { label: "Stale / tidak ada data", color: "var(--ispu-stale)" },
+  { label: "Tidak berfungsi / tidak ada data", color: "var(--ispu-stale)" },
 ];
 export function ISPULegend() {
   return (

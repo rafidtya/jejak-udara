@@ -8,9 +8,17 @@ venv/
 .pytest_cache/
 dist/
 
-# env & secrets
-.env
+# env & secrets — .env* catches .env, .env.local, .env.production, etc.
+# (a bare ".env" entry does NOT match ".env.local" — that gap is how
+# web/.env.local with a real Mapbox token ended up staged; see workflow.md)
+# then un-ignore the checked-in placeholder templates explicitly.
+.env*
+!.env.example
+!**/.env.example
 *.service-account.json
+*.pem
+*.key
+id_rsa*
 
 # data — DB is the store; git holds code + small fixtures only
 data/

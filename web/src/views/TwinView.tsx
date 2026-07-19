@@ -3,8 +3,8 @@
  * design chrome + ScenarioButton + DeltaBadge. Height/color = concentration above
  * background. All labeled simulasi.
  */
-import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useRef, useState } from "react";
 import { api, type WhatIf } from "../api";
 import { MapControls, NavTabs, TopBar, type View } from "../components/chrome";
@@ -24,8 +24,8 @@ const SRC_ICON: Record<string, string> = { lalu_lintas: "🚗", industri: "🏭"
 
 export default function TwinView({ view, onChange, stationCount, sourceCount }: Props) {
   const mapDiv = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
   const [sel, setSel] = useState("baseline");
   const [result, setResult] = useState<WhatIf | null>(null);
 
@@ -61,7 +61,7 @@ export default function TwinView({ view, onChange, stationCount, sourceCount }: 
     const m = mapRef.current;
     if (!m || !result?.available) return;
     const apply = () => {
-      const src = m.getSource("plume") as maplibregl.GeoJSONSource | undefined;
+      const src = m.getSource("plume") as mapboxgl.GeoJSONSource | undefined;
       if (!src) return;
       src.setData(gridToColumns(result.after, result.nrows, result.ncols, result.bbox, BG) as unknown as GeoJSON.GeoJSON);
       markersRef.current.forEach((mk) => mk.remove());
@@ -69,7 +69,7 @@ export default function TwinView({ view, onChange, stationCount, sourceCount }: 
         const el = document.createElement("div");
         el.className = "source-marker"; el.textContent = SRC_ICON[s.label] ?? "📍";
         el.style.fontSize = "22px"; el.title = `${s.label} (ilustratif)`;
-        return new maplibregl.Marker({ element: el }).setLngLat([s.lon, s.lat]).addTo(m);
+        return new mapboxgl.Marker({ element: el }).setLngLat([s.lon, s.lat]).addTo(m);
       });
     };
     if (m.isStyleLoaded() && m.getSource("plume")) apply(); else m.once("idle", apply);

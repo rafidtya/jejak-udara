@@ -12,3 +12,15 @@ body {
 }
 h1, h2, h3, p { margin: 0; }
 button { font-family: var(--font-ui); }
+
+/* Mapbox GL sets tabindex="0" on its canvas for keyboard panning; clicking the
+   map focuses it and the browser draws its native focus ring (a yellow/orange
+   box on this platform). Keep a focus indicator for keyboard users only, and
+   make it match the design system instead of the browser default. */
+.mapboxgl-canvas {
+  outline: none;
+}
+.mapboxgl-canvas:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: -2px;
+}

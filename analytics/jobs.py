@@ -37,7 +37,10 @@ def latest_ispu() -> list[dict]:
                    ST_X(s.geom) AS lon, ST_Y(s.geom) AS lat,
                    s.meta->>'kecamatan' AS kecamatan
             FROM readings r JOIN stations s USING (station_id)
-            WHERE r.is_index AND r.qa_flag <> 'stale'
+            -- value>0: an ISPU of 0 is physically impossible in Jakarta; it
+            -- marks a non-functioning sensor. Excluded so it can't drag the
+            -- interpolated surface / hotspots / twin anchoring downward.
+            WHERE r.is_index AND r.qa_flag <> 'stale' AND r.value > 0
             ORDER BY r.station_id, r.ts DESC, r.value DESC
             """,
         ).fetchall()
@@ -47,6 +50,20 @@ def latest_ispu() -> list[dict]:
 
 
 # ---------- Layer B: surface + validation ----------
+
+# SPKU spacing is ~1-2km (workflow.md C2a); full confidence within that, tapering
+# to a faint (not zero -- still "here be estimate", not "invisible") floor by 6km.
+_CONF_NEAR_M = 1500.0
+_CONF_FAR_M = 6000.0
+_CONF_FLOOR = 0.05
+
+
+def _distance_confidence(grid_xy: np.ndarray, station_xy: np.ndarray) -> np.ndarray:
+    """Per grid-cell opacity multiplier (0..1) from distance to the nearest real
+    station. Linear taper CONF_NEAR->1.0 to CONF_FAR->CONF_FLOOR; clipped beyond."""
+    d = np.sqrt(((grid_xy[:, None, :] - station_xy[None, :, :]) ** 2).sum(-1)).min(axis=1)
+    frac = (d - _CONF_NEAR_M) / (_CONF_FAR_M - _CONF_NEAR_M)
+    return np.clip(1.0 - frac * (1.0 - _CONF_FLOOR), _CONF_FLOOR, 1.0)
 
 def run_layer_b() -> dict:
     rd = latest_ispu()
@@ -61,12 +78,17 @@ def run_layer_b() -> dict:
     grid_xy, shape = grid_over_bbox(bbox_metric(), cell_m=CELL_M)
     surface = idw(xy, v, grid_xy).reshape(shape)
     metrics = loocv(xy, v)
+    confidence = _distance_confidence(grid_xy, xy)
 
     grid_json = {
         "bbox": [106.65, -6.40, 107.00, -6.05],
         "nrows": shape[0], "ncols": shape[1], "cell_m": CELL_M,
         "metric": metric, "n_stations": len(rd),
         "values": [round(float(x), 2) for x in surface.ravel()],
+        # per-cell 0..1 opacity multiplier -- fades the surface out away from any
+        # real station instead of painting a flat, equally-confident rectangle
+        # over areas (neighboring cities, the bay) with zero actual coverage.
+        "confidence": [round(float(x), 3) for x in confidence],
     }
     now = utcnow()
     with db() as conn:
@@ -134,7 +156,9 @@ def run_layer_a() -> dict:
                 WHERE wh2.station_id = r.station_id
                 ORDER BY abs(extract(epoch FROM (wh2.ts - r.ts))) LIMIT 1
             ) w ON true
-            WHERE r.pollutant = %s AND NOT r.is_index AND r.qa_flag <> 'stale'
+            -- value>0: drop broken 0-readings so they can't create spurious
+            -- CPF / source directions (a 0 ug/m3 PM2.5 in Jakarta = dead sensor).
+            WHERE r.pollutant = %s AND NOT r.is_index AND r.qa_flag <> 'stale' AND r.value > 0
             """,
             (POLLUTANT,),
         ).fetchall()

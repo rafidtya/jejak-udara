@@ -29,7 +29,11 @@ export interface StationsFC { type: "FeatureCollection"; features: StationFeatur
 export interface Surface {
   available: boolean; reason?: string;
   bbox: [number, number, number, number]; nrows: number; ncols: number; cell_m: number;
-  metric: string; n_stations: number; values: number[]; disclaimer: string;
+  metric: string; n_stations: number; values: number[];
+  /** Per-cell 0..1 opacity multiplier — fades the surface away from real
+   *  stations instead of painting flat confidence over unmonitored areas. */
+  confidence?: number[];
+  disclaimer: string;
 }
 
 export interface Hotspot { district: string; pollutant: string; gi_z: number; ts: string; flagged: boolean }
